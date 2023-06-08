@@ -1,5 +1,6 @@
 import socket
 import threading
+import structlog
 
 class Server:
     def __init__(self) -> None:
@@ -19,6 +20,7 @@ class Server:
         self.DISCONNETED = ['q', 'exit', 'close', 'disconnect']
         self.clients = []
         self.nicknames = []
+        self.logger = structlog.get_logger()
     
     def broadcast(self, msg, client=None) -> None:
         """
@@ -50,7 +52,7 @@ class Server:
         self.server.bind((self.host, self.port))
         self.server.listen()
         
-        print(f'Server is listening on {self.host}:{self.port}')
+        self.logger.info(f'Server is listening on {self.host}:{self.port}')
         
         self.listen()
             
@@ -73,7 +75,10 @@ class Server:
                 if msg in self.DISCONNETED:
                     is_connected = False
                     break
+                
                 self.broadcast(msg, client)
+                self.logger.info("Total Connections : {}".format(threading.activeCount()-1))
+                
             except:
                 index = self.clients.index(client)
                 self.clients.remove(client)
@@ -104,12 +109,11 @@ class Server:
             self.clients.append(client)
             
         
-            print("Nickname is {}".format(self.nickname))
+            self.logger.info("Welcome {} to the chatroom".format(self.nickname))
             self.broadcast("{} joined!".format(self.nickname).encode('ascii'), client)
-            client.send('Connected to server!'.encode('ascii'))
+            client.send("{} connected to server!".format(self.nickname).encode('ascii'))
 
-        # Start Handling Thread For Client
+            # Start Handling Thread For Client
+            self.logger.info("Starting thread for {}".format(self.nickname))
             threading.Thread(target=self.handle_client, args=(client, addr)).start()
         
-s = Server()
-s.start_server()

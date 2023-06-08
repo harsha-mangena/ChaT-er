@@ -1,5 +1,6 @@
 import socket
 import threading
+import structlog
 
 class Client:
     def __init__(self, nickname) -> None:
@@ -18,6 +19,7 @@ class Client:
         self.port = 5051
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client.connect((self.host, self.port))
+        self.logger = structlog.get_logger()
 
     def receive(self):
         """
@@ -56,7 +58,7 @@ class Client:
             message = '{}: {}'.format(self.name, input(''))
             self.client.send(message.encode('ascii'))
             
-    def start(self):
+    def connect_to_server(self):
         """
         Starts two threads, one for receiving and one for writing, in order to enable 
         concurrent communication between client and server. The function takes no 
@@ -68,8 +70,7 @@ class Client:
         write_thread = threading.Thread(target=self.write)
         write_thread.start()
 
-name = input('Enter Name:')        
-client = Client(name)
-client.start()
-
-
+if __name__ == '__main__':
+    name = input("Enter your name : ")
+    client = Client(name)
+    client.connect_to_server()
