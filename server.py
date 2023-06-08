@@ -1,47 +1,115 @@
 import socket
 import threading
-import random
 
-IP_ADDR = socket.gethostbyname(socket.gethostname())
-PORT = random.randint(0,65300)
-ADDR = (IP_ADDR, PORT)
-FORMAT = 'utf-8'
-DISCONNECT = ['close', 'exit', 'disconnect']
+class Server:
+    def __init__(self) -> None:
+        """
+        Initializes the class instance with default values for variables `host`,
+        `port`, `server`, `DISCONNECTED`, `clients`, and `nicknames`.
 
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind(ADDR)
+        Args:
+            self: An instance of the class.
 
-def start_server():
-    print(f'[STARTING] Server is starting on {IP_ADDR}:{PORT}')
-    server.listen()
+        Returns:
+            None
+        """
+        self.host = socket.gethostbyname(socket.gethostname())
+        self.port = 5051
+        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.DISCONNETED = ['q', 'exit', 'close', 'disconnect']
+        self.clients = []
+        self.nicknames = []
     
-    while True:
-        conn, addr = server.accept()
-        new_connection_thread = threading.Thread(target=handle_client, args=(conn, addr))
-        new_connection_thread.start()
+    def broadcast(self, msg, client=None) -> None:
+        """
+        Sends a message to all clients in the chatroom except for the client who sent the message.
 
-def encode_message():
-    pass
+        :param msg: The message to send to all clients.
+        :type msg: str
+        :param client: The client who sent the message. This client will not receive the message.
+        :type client: Any
+        :return: None
+        :rtype: None
+        """
+        for _client in self.clients:
+            if _client != client:
+                _client.send(msg)
+            
+    def start_server(self):
+        """
+        Starts a server by binding to the host and port specified in the instance variables, 
+        listening for incoming client connections, and calling the listen function to handle 
+        incoming requests. 
 
-def decode_message():
-    pass 
+        Parameters:
+        self (object): The instance of the class that this method operates on.
 
-def handle_client(conn, addr):
-    is_connected = True
-    while is_connected:
-        msg_length = conn.recv(1024).decode(FORMAT)
-        msg_length = int(msg_length)
+        Returns:
+        None
+        """
+        self.server.bind((self.host, self.port))
+        self.server.listen()
         
-        if msg_length:
-            msg = conn.recv(msg_length).decode(FORMAT)
+        print(f'Server is listening on {self.host}:{self.port}')
+        
+        self.listen()
             
-            if msg in DISCONNECT:
-                is_connected = False
-            
-            print(f'{addr} : {msg}')
+    def handle_client(self, client, addr):
+        """
+        Handle a client connection by receiving messages from the client and broadcasting them to all other clients.
+        
+        Args:
+            client (socket): The connected socket object representing the client.
+            addr (tuple): A tuple containing the IP address and port number of the client.
+        
+        Returns:
+            None
+        """
+        is_connected = True
+        while is_connected:
+            try:
+                msg = client.recv(1024)
+                
+                if msg in self.DISCONNETED:
+                    is_connected = False
+                    break
+                self.broadcast(msg, client)
+            except:
+                index = self.clients.index(client)
+                self.clients.remove(client)
+                client.close()
+                nickname = self.nicknames[index]
+                self.broadcast('{} left!'.format(nickname).encode('ascii'), client)
+                self.nicknames.remove(nickname)
+                break
     
-    conn.close()
+    def listen(self):
+        """
+        Listens for incoming connections and accepts them. Once a connection is made, it receives the nickname
+        of the user and adds it to the list of nicknames and clients. Then it broadcasts to all users that the
+        new user has joined. Finally, it starts a new thread to handle the client and its messages.
 
-if __name__ == '__main__':
-    start_server()
+        Parameters:
+        None
+
+        Returns:
+        None
+        """
+        while True:
+            client, addr = self.server.accept()
             
+            client.send('GET_NAME'.encode('ascii'))
+            self.nickname = client.recv(1024).decode('ascii')
+            self.nicknames.append(self.nickname)
+            self.clients.append(client)
+            
+        
+            print("Nickname is {}".format(self.nickname))
+            self.broadcast("{} joined!".format(self.nickname).encode('ascii'), client)
+            client.send('Connected to server!'.encode('ascii'))
+
+        # Start Handling Thread For Client
+            threading.Thread(target=self.handle_client, args=(client, addr)).start()
+        
+s = Server()
+s.start_server()
